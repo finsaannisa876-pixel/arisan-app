@@ -22,6 +22,9 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px
 th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color:#d34a4a}
 .actions button{width:auto;padding:7px 10px;margin-right:4px;font-size:12px}
 .empty{text-align:center;color:#888;padding:20px}
+.alert-box{padding:12px;border-radius:10px;margin-bottom:16px;font-weight:bold;font-size:14px}
+.alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+.alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
 @media(max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}form{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}table{font-size:12px}th,td{padding:9px 5px}.container{padding:12px}}
 </style>
 </head>
@@ -31,6 +34,8 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
     <h1>Arisan Mingguan</h1>
     <div class="muted">Monitoring setoran arisan real-time</div>
   </header>
+
+  <div id="statusKoneksi" class="alert-box" style="display:none;"></div>
 
   <div class="cards">
     <div class="card"><div class="label">Total Anggota</div><div class="value" id="totalAnggota">0</div></div>
@@ -43,7 +48,7 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
     <h2>Tambah Anggota</h2>
     <form id="anggotaForm">
       <input id="namaAnggota" class="wide" placeholder="Nama anggota baru" required>
-      <button type="submit">Tambah</button>
+      <button type="submit" id="btnTambah">Tambah</button>
     </form>
   </div>
 
@@ -75,19 +80,36 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 </div>
 
 <script>
-const SUPABASE_URL = 'https://inkpmmnuevixoeyfrvqm.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlua3BtbW51ZXZpeG9leWZydnFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODQ2NjAsImV4cCI6MjEwNDM2MDY2MH0.O9TPF0rlWOQZxSHNJ0w7AqJvoBEFiuz5IeAyjLYAEIw';
+// URL dan API Key terbaru
+const SUPABASE_URL = 'https://pxtdqchgjniufvqnayjt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGRxY2hnam5pdWZ2cW5heWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODk5ODgsImV4cCI6MjEwNDM2NTk4OH0.cF3-UapfmJl6Mlt9QPMhn-4rEBAt5HwmgAmFPQrXZ_I';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const rupiah = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 const today = () => new Date().toISOString().slice(0, 10);
 
+function tampilkanStatus(pesan, isError = false) {
+  const el = document.getElementById('statusKoneksi');
+  el.style.display = 'block';
+  el.className = 'alert-box ' + (isError ? 'alert-error' : 'alert-success');
+  el.innerHTML = pesan;
+}
+
+async function tesKoneksi() {
+  const { data, error } = await supabase.from('anggota').select('count', { count: 'exact' });
+  if (error) {
+    tampilkanStatus("❌ KONEKSI GAGAL: " + error.message, true);
+  } else {
+    tampilkanStatus("✅ KONEKSI BERHASIL! Database Supabase terhubung.", false);
+  }
+}
+
 async function loadData() {
   const { data: anggota, error: errA } = await supabase.from('anggota').select('*').order('id', { ascending: true });
   const { data: setoran, error: errS } = await supabase.from('setoran').select('*').order('created_at', { ascending: false });
 
-  if (errA) console.error("Error Anggota:", errA);
-  if (errS) console.error("Error Setoran:", errS);
+  if (errA) tampilkanStatus("❌ Gagal load tabel anggota: " + errA.message, true);
+  if (errS) tampilkanStatus("❌ Gagal load tabel setoran: " + errS.message, true);
 
   const listAnggota = anggota || [];
   const listSetoran = setoran || [];
@@ -128,13 +150,22 @@ async function loadData() {
 
 document.getElementById('anggotaForm').onsubmit = async (e) => {
   e.preventDefault();
+  const btn = document.getElementById('btnTambah');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
   const nama = document.getElementById('namaAnggota').value.trim();
   if (nama) {
     const { error } = await supabase.from('anggota').insert([{ nama }]);
-    if (error) alert("Gagal tambah anggota: " + error.message);
-    document.getElementById('namaAnggota').value = '';
-    loadData();
+    if (error) {
+      alert("Gagal Tambah Anggota!\nSebab: " + error.message);
+    } else {
+      document.getElementById('namaAnggota').value = '';
+      await loadData();
+    }
   }
+  btn.disabled = false;
+  btn.textContent = 'Tambah';
 };
 
 document.getElementById('setoranForm').onsubmit = async (e) => {
@@ -144,9 +175,12 @@ document.getElementById('setoranForm').onsubmit = async (e) => {
   const jumlah = Number(document.getElementById('jumlah').value);
   if (nama && tanggal && jumlah >= 0) {
     const { error } = await supabase.from('setoran').insert([{ nama, tanggal, jumlah }]);
-    if (error) alert("Gagal simpan setoran: " + error.message);
-    document.getElementById('jumlah').value = '';
-    loadData();
+    if (error) {
+      alert("Gagal Simpan Setoran!\nSebab: " + error.message);
+    } else {
+      document.getElementById('jumlah').value = '';
+      await loadData();
+    }
   }
 };
 
@@ -154,7 +188,7 @@ async function hapusSetoran(id) {
   if (confirm('Hapus data setoran ini?')) {
     const { error } = await supabase.from('setoran').delete().eq('id', id);
     if (error) alert("Gagal hapus: " + error.message);
-    loadData();
+    await loadData();
   }
 }
 
@@ -162,6 +196,7 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
 }
 
+tesKoneksi();
 loadData();
 </script>
 </body>
