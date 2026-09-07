@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Arisan Mingguan</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#20242b}
 .container{max-width:900px;margin:auto;padding:20px}
@@ -80,10 +79,16 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 </div>
 
 <script>
-// URL dan API Key terbaru
-const SUPABASE_URL = 'https://pxtdqchgjniufvqnayjt.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGRxY2hnam5pdWZ2cW5heWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODk5ODgsImV4cCI6MjEwNDM2NTk4OH0.cF3-UapfmJl6Mlt9QPMhn-4rEBAt5HwmgAmFPQrXZ_I';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// URL REST API Utuh
+const API_URL = 'https://pxtdqchgjniufvqnayjt.supabase.co/rest/v1/';
+const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGRxY2hnam5pdWZ2cW5heWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODk5ODgsImV4cCI6MjEwNDM2NTk4OH0.cF3-UapfmJl6Mlt9QPMhn-4rEBAt5HwmgAmFPQrXZ_I';
+
+const headers = {
+  'apikey': API_KEY,
+  'Authorization': 'Bearer ' + API_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
 
 const rupiah = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -95,21 +100,26 @@ function tampilkanStatus(pesan, isError = false) {
   el.innerHTML = pesan;
 }
 
-async function tesKoneksi() {
-  const { data, error } = await supabase.from('anggota').select('count', { count: 'exact' });
-  if (error) {
-    tampilkanStatus("❌ KONEKSI GAGAL: " + error.message, true);
-  } else {
-    tampilkanStatus("✅ KONEKSI BERHASIL! Database Supabase terhubung.", false);
+async function apiFetch(endpoint, method = 'GET', body = null) {
+  try {
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
+    const res = await fetch(`${API_URL}${endpoint}`, options);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err };
   }
 }
 
 async function loadData() {
-  const { data: anggota, error: errA } = await supabase.from('anggota').select('*').order('id', { ascending: true });
-  const { data: setoran, error: errS } = await supabase.from('setoran').select('*').order('created_at', { ascending: false });
+  const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=id.asc');
+  const { data: setoran, error: errS } = await apiFetch('setoran?select=*&order=created_at.desc');
 
-  if (errA) tampilkanStatus("❌ Gagal load tabel anggota: " + errA.message, true);
-  if (errS) tampilkanStatus("❌ Gagal load tabel setoran: " + errS.message, true);
+  if (errA) tampilkanStatus("❌ Gagal load anggota: " + errA.message, true);
+  else if (errS) tampilkanStatus("❌ Gagal load setoran: " + errS.message, true);
+  else tampilkanStatus("✅ KONEKSI BERHASIL! Database Supabase terhubung.", false);
 
   const listAnggota = anggota || [];
   const listSetoran = setoran || [];
@@ -156,9 +166,9 @@ document.getElementById('anggotaForm').onsubmit = async (e) => {
 
   const nama = document.getElementById('namaAnggota').value.trim();
   if (nama) {
-    const { error } = await supabase.from('anggota').insert([{ nama }]);
+    const { error } = await apiFetch('anggota', 'POST', [{ nama }]);
     if (error) {
-      alert("Gagal Tambah Anggota!\nSebab: " + error.message);
+      alert("Gagal Tambah Anggota!\n" + error.message);
     } else {
       document.getElementById('namaAnggota').value = '';
       await loadData();
@@ -174,9 +184,9 @@ document.getElementById('setoranForm').onsubmit = async (e) => {
   const tanggal = document.getElementById('tanggal').value;
   const jumlah = Number(document.getElementById('jumlah').value);
   if (nama && tanggal && jumlah >= 0) {
-    const { error } = await supabase.from('setoran').insert([{ nama, tanggal, jumlah }]);
+    const { error } = await apiFetch('setoran', 'POST', [{ nama, tanggal, jumlah }]);
     if (error) {
-      alert("Gagal Simpan Setoran!\nSebab: " + error.message);
+      alert("Gagal Simpan Setoran!\n" + error.message);
     } else {
       document.getElementById('jumlah').value = '';
       await loadData();
@@ -186,7 +196,7 @@ document.getElementById('setoranForm').onsubmit = async (e) => {
 
 async function hapusSetoran(id) {
   if (confirm('Hapus data setoran ini?')) {
-    const { error } = await supabase.from('setoran').delete().eq('id', id);
+    const { error } = await apiFetch(`setoran?id=eq.${id}`, 'DELETE');
     if (error) alert("Gagal hapus: " + error.message);
     await loadData();
   }
@@ -196,7 +206,6 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
 }
 
-tesKoneksi();
 loadData();
 </script>
 </body>
