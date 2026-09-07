@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Arisan Mingguan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#20242b}
 .container{max-width:900px;margin:auto;padding:20px}
@@ -26,97 +27,137 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 </head>
 <body>
 <div class="container">
-<header>
-<h1>Arisan Mingguan</h1>
-<div class="muted">Monitoring setoran arisan sederhana</div>
-</header>
+  <header>
+    <h1>Arisan Mingguan</h1>
+    <div class="muted">Monitoring setoran arisan real-time</div>
+  </header>
 
-<div class="cards">
-<div class="card"><div class="label">Total Anggota</div><div class="value" id="totalAnggota">0</div></div>
-<div class="card"><div class="label">Sudah Setor</div><div class="value" id="sudahSetor">0</div></div>
-<div class="card"><div class="label">Belum Setor</div><div class="value" id="belumSetor">0</div></div>
-<div class="card"><div class="label">Total Terkumpul</div><div class="value" id="totalUang">Rp0</div></div>
-</div>
+  <div class="cards">
+    <div class="card"><div class="label">Total Anggota</div><div class="value" id="totalAnggota">0</div></div>
+    <div class="card"><div class="label">Sudah Setor</div><div class="value" id="sudahSetor">0</div></div>
+    <div class="card"><div class="label">Belum Setor</div><div class="value" id="belumSetor">0</div></div>
+    <div class="card"><div class="label">Total Terkumpul</div><div class="value" id="totalUang">Rp0</div></div>
+  </div>
 
-<div class="panel">
-<h2>Tambah Anggota</h2>
-<form id="anggotaForm">
-<input id="namaAnggota" class="wide" placeholder="Nama anggota" required>
-<button type="submit">Tambah</button>
-</form>
-</div>
+  <div class="panel">
+    <h2>Tambah Anggota</h2>
+    <form id="anggotaForm">
+      <input id="namaAnggota" class="wide" placeholder="Nama anggota baru" required>
+      <button type="submit">Tambah</button>
+    </form>
+  </div>
 
-<div class="panel">
-<h2>Input Setoran</h2>
-<form id="setoranForm">
-<select id="namaSetoran" required><option value="">Pilih nama</option></select>
-<input id="tanggal" type="date" required>
-<input id="jumlah" type="number" min="0" placeholder="Jumlah (Rp)" required>
-<button type="submit">Simpan</button>
-</form>
-</div>
+  <div class="panel">
+    <h2>Input Setoran</h2>
+    <form id="setoranForm">
+      <select id="namaSetoran" required><option value="">Pilih nama</option></select>
+      <input id="tanggal" type="date" required>
+      <input id="jumlah" type="number" min="0" placeholder="Jumlah (Rp)" required>
+      <button type="submit">Simpan</button>
+    </form>
+  </div>
 
-<div class="panel">
-<h2>Monitoring Minggu Ini</h2>
-<table>
-<thead><tr><th>No</th><th>Nama</th><th>Tanggal Setor</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
-<tbody id="monitoring"></tbody>
-</table>
-</div>
+  <div class="panel">
+    <h2>Monitoring Hari Ini</h2>
+    <table>
+      <thead><tr><th>No</th><th>Nama</th><th>Tanggal Setor</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody id="monitoring"></tbody>
+    </table>
+  </div>
 
-<div class="panel">
-<h2>Riwayat Setoran</h2>
-<table>
-<thead><tr><th>Nama</th><th>Tanggal</th><th>Jumlah</th><th>Aksi</th></tr></thead>
-<tbody id="riwayat"></tbody>
-</table>
-</div>
+  <div class="panel">
+    <h2>Riwayat Setoran</h2>
+    <table>
+      <thead><tr><th>Nama</th><th>Tanggal</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+      <tbody id="riwayat"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-const KEY='arisanDataV1';
-let data=JSON.parse(localStorage.getItem(KEY)||'{"anggota":[],"setoran":[]}');
+// SUDAH DIHUBUNGKAN KE SUPABASE KAMU
+const SUPABASE_URL = 'https://monitoring-arisan-app.supabase.co'; // Ganti URL ini dari Data API Supabase jika berbeda
+const SUPABASE_KEY = 'sb_publishable_Wojxd57Pd3lyqzML9HGAGQ_j4f6WB9z';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const rupiah=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
-function save(){localStorage.setItem(KEY,JSON.stringify(data));render();}
-function today(){return new Date().toISOString().slice(0,10)}
+const rupiah = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const today = () => new Date().toISOString().slice(0, 10);
 
-document.getElementById('anggotaForm').onsubmit=e=>{
- e.preventDefault();
- const nama=document.getElementById('namaAnggota').value.trim();
- if(nama && !data.anggota.includes(nama)){data.anggota.push(nama);document.getElementById('namaAnggota').value='';save();}
-};
+async function loadData() {
+  const { data: anggota } = await supabase.from('anggota').select('*').order('id', { ascending: true });
+  const { data: setoran } = await supabase.from('setoran').select('*').order('created_at', { ascending: false });
 
-document.getElementById('setoranForm').onsubmit=e=>{
- e.preventDefault();
- const nama=document.getElementById('namaSetoran').value;
- const tanggal=document.getElementById('tanggal').value;
- const jumlah=Number(document.getElementById('jumlah').value);
- if(nama&&tanggal&&jumlah>=0){data.setoran.push({id:Date.now(),nama,tanggal,jumlah});document.getElementById('jumlah').value='';save();}
-};
+  const listAnggota = anggota || [];
+  const listSetoran = setoran || [];
 
-function render(){
- const names=document.getElementById('namaSetoran');
- names.innerHTML='<option value="">Pilih nama</option>'+data.anggota.map(n=>`<option>${esc(n)}</option>`).join('');
- const todayDate=today();
- const weekly=data.setoran.filter(x=>x.tanggal===todayDate);
- const paidNames=new Set(weekly.map(x=>x.nama));
- document.getElementById('totalAnggota').textContent=data.anggota.length;
- document.getElementById('sudahSetor').textContent=paidNames.size;
- document.getElementById('belumSetor').textContent=Math.max(0,data.anggota.length-paidNames.size);
- document.getElementById('totalUang').textContent=rupiah(data.setoran.reduce((a,x)=>a+x.jumlah,0));
+  const select = document.getElementById('namaSetoran');
+  select.innerHTML = '<option value="">Pilih nama</option>' + listAnggota.map(a => `<option value="${esc(a.nama)}">${esc(a.nama)}</option>`).join('');
 
- document.getElementById('monitoring').innerHTML=data.anggota.length?data.anggota.map((n,i)=>{
-   const s=[...weekly].reverse().find(x=>x.nama===n);
-   return `<tr><td>${i+1}</td><td>${esc(n)}</td><td>${s?s.tanggal:'—'}</td><td>${s?rupiah(s.jumlah):'—'}</td><td class="status ${s?'ok':'no'}">${s?'Sudah setor':'Belum setor'}</td><td class="actions">${s?`<button class="secondary" onclick="hapus(${s.id})">Hapus</button>`:''}</td></tr>`
- }).join(''):'<tr><td colspan="6" class="empty">Belum ada anggota.</td></tr>';
+  const todayDate = today();
+  const setoranHariIni = listSetoran.filter(s => s.tanggal === todayDate);
+  const sudahSetorSet = new Set(setoranHariIni.map(s => s.nama));
 
- document.getElementById('riwayat').innerHTML=data.setoran.length?[...data.setoran].sort((a,b)=>b.tanggal.localeCompare(a.tanggal)).map(x=>`<tr><td>${esc(x.nama)}</td><td>${x.tanggal}</td><td>${rupiah(x.jumlah)}</td><td class="actions"><button class="secondary" onclick="hapus(${x.id})">Hapus</button></td></tr>`).join(''):'<tr><td colspan="4" class="empty">Belum ada setoran.</td></tr>';
- document.getElementById('tanggal').value ||= todayDate;
+  document.getElementById('totalAnggota').textContent = listAnggota.length;
+  document.getElementById('sudahSetor').textContent = sudahSetorSet.size;
+  document.getElementById('belumSetor').textContent = Math.max(0, listAnggota.length - sudahSetorSet.size);
+  document.getElementById('totalUang').textContent = rupiah(listSetoran.reduce((acc, curr) => acc + Number(curr.jumlah), 0));
+
+  document.getElementById('monitoring').innerHTML = listAnggota.length ? listAnggota.map((a, i) => {
+    const s = setoranHariIni.find(x => x.nama === a.nama);
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(a.nama)}</td>
+      <td>${s ? s.tanggal : '—'}</td>
+      <td>${s ? rupiah(s.jumlah) : '—'}</td>
+      <td class="status ${s ? 'ok' : 'no'}">${s ? 'Sudah setor' : 'Belum setor'}</td>
+      <td class="actions">${s ? `<button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button>` : ''}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Belum ada anggota.</td></tr>';
+
+  document.getElementById('riwayat').innerHTML = listSetoran.length ? listSetoran.map(s => `<tr>
+    <td>${esc(s.nama)}</td>
+    <td>${s.tanggal}</td>
+    <td>${rupiah(s.jumlah)}</td>
+    <td class="actions"><button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button></td>
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">Belum ada setoran.</td></tr>';
+
+  document.getElementById('tanggal').value = todayDate;
 }
-function hapus(id){if(confirm('Hapus data setoran ini?')){data.setoran=data.setoran.filter(x=>x.id!==id);save();}}
-function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
-render();
+
+document.getElementById('anggotaForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const nama = document.getElementById('namaAnggota').value.trim();
+  if (nama) {
+    await supabase.from('anggota').insert([{ nama }]);
+    document.getElementById('namaAnggota').value = '';
+    loadData();
+  }
+};
+
+document.getElementById('setoranForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const nama = document.getElementById('namaSetoran').value;
+  const tanggal = document.getElementById('tanggal').value;
+  const jumlah = Number(document.getElementById('jumlah').value);
+  if (nama && tanggal && jumlah >= 0) {
+    await supabase.from('setoran').insert([{ nama, tanggal, jumlah }]);
+    document.getElementById('jumlah').value = '';
+    loadData();
+  }
+};
+
+async function hapusSetoran(id) {
+  if (confirm('Hapus data setoran ini?')) {
+    await supabase.from('setoran').delete().eq('id', id);
+    loadData();
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+}
+
+loadData();
 </script>
 </body>
 </html>
