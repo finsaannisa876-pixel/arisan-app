@@ -6,15 +6,17 @@
 <title>Arisan Mingguan</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#20242b}
-.container{max-width:900px;margin:auto;padding:20px}
+.container{max-width:950px;margin:auto;padding:20px}
 header{background:#fff;border-radius:18px;padding:22px;margin-bottom:16px;box-shadow:0 3px 15px #0000000d}
 h1{margin:0 0 6px;font-size:26px}.muted{color:#707782;font-size:14px}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
 .card{background:#fff;border-radius:15px;padding:16px;box-shadow:0 3px 15px #0000000d}.label{font-size:12px;color:#777}.value{font-size:21px;font-weight:700;margin-top:6px}
 .panel{background:#fff;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 3px 15px #0000000d}
-h2{font-size:18px;margin:0 0 14px}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h2{font-size:18px;margin:0}
 form{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px}
 input,select,button{width:100%;padding:11px;border:1px solid #ddd;border-radius:10px;font-size:14px}
+.search-input{max-width:250px;padding:8px 12px;font-size:13px}
 button{background:#20242b;color:white;border:0;cursor:pointer;font-weight:600}
 button.secondary{background:#eef0f4;color:#20242b}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee;font-size:14px}
@@ -24,7 +26,8 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 .alert-box{padding:12px;border-radius:10px;margin-bottom:16px;font-weight:bold;font-size:14px}
 .alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
 .alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-@media(max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}form{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}table{font-size:12px}th,td{padding:9px 5px}.container{padding:12px}}
+.table-container{max-height:500px;overflow-y:auto}
+@media(max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}form{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}table{font-size:12px}th,td{padding:9px 5px}.container{padding:12px}.panel-header{flex-direction:column;align-items:flex-start;gap:10px}.search-input{max-width:100%}}
 </style>
 </head>
 <body>
@@ -62,24 +65,33 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
   </div>
 
   <div class="panel">
-    <h2>Monitoring Hari Ini</h2>
-    <table>
-      <thead><tr><th>No</th><th>Nama</th><th>Tanggal Setor</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
-      <tbody id="monitoring"></tbody>
-    </table>
+    <div class="panel-header">
+      <h2>Monitoring Hari Ini</h2>
+      <input type="text" id="searchMonitoring" class="search-input" placeholder="🔍 Cari nama anggota..." onkeyup="filterMonitoring()">
+    </div>
+    <div class="table-container">
+      <table>
+        <thead><tr><th>No</th><th>Nama</th><th>Tanggal Setor</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
+        <tbody id="monitoring"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel">
-    <h2>Riwayat Setoran</h2>
-    <table>
-      <thead><tr><th>Nama</th><th>Tanggal</th><th>Jumlah</th><th>Aksi</th></tr></thead>
-      <tbody id="riwayat"></tbody>
-    </table>
+    <div class="panel-header">
+      <h2>Riwayat Setoran</h2>
+      <input type="text" id="searchRiwayat" class="search-input" placeholder="🔍 Cari riwayat..." onkeyup="filterRiwayat()">
+    </div>
+    <div class="table-container">
+      <table>
+        <thead><tr><th>Nama</th><th>Tanggal</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+        <tbody id="riwayat"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <script>
-// URL REST API Utuh
 const API_URL = 'https://pxtdqchgjniufvqnayjt.supabase.co/rest/v1/';
 const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGRxY2hnam5pdWZ2cW5heWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODk5ODgsImV4cCI6MjEwNDM2NTk4OH0.cF3-UapfmJl6Mlt9QPMhn-4rEBAt5HwmgAmFPQrXZ_I';
 
@@ -92,6 +104,9 @@ const headers = {
 
 const rupiah = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 const today = () => new Date().toISOString().slice(0, 10);
+
+let globalAnggota = [];
+let globalSetoran = [];
 
 function tampilkanStatus(pesan, isError = false) {
   const el = document.getElementById('statusKoneksi');
@@ -114,29 +129,43 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
 }
 
 async function loadData() {
-  const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=id.asc');
-  const { data: setoran, error: errS } = await apiFetch('setoran?select=*&order=created_at.desc');
+  // Menaikkan limit pengambilan data hingga 1000 baris
+  const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=id.asc&limit=1000');
+  const { data: setoran, error: errS } = await apiFetch('setoran?select=*&order=created_at.desc&limit=2000');
 
   if (errA) tampilkanStatus("❌ Gagal load anggota: " + errA.message, true);
   else if (errS) tampilkanStatus("❌ Gagal load setoran: " + errS.message, true);
   else tampilkanStatus("✅ KONEKSI BERHASIL! Database Supabase terhubung.", false);
 
-  const listAnggota = anggota || [];
-  const listSetoran = setoran || [];
+  globalAnggota = anggota || [];
+  globalSetoran = setoran || [];
 
   const select = document.getElementById('namaSetoran');
-  select.innerHTML = '<option value="">Pilih nama</option>' + listAnggota.map(a => `<option value="${esc(a.nama)}">${esc(a.nama)}</option>`).join('');
+  select.innerHTML = '<option value="">Pilih nama</option>' + globalAnggota.map(a => `<option value="${esc(a.nama)}">${esc(a.nama)}</option>`).join('');
 
   const todayDate = today();
-  const setoranHariIni = listSetoran.filter(s => s.tanggal === todayDate);
+  const setoranHariIni = globalSetoran.filter(s => s.tanggal === todayDate);
   const sudahSetorSet = new Set(setoranHariIni.map(s => s.nama));
 
-  document.getElementById('totalAnggota').textContent = listAnggota.length;
+  document.getElementById('totalAnggota').textContent = globalAnggota.length;
   document.getElementById('sudahSetor').textContent = sudahSetorSet.size;
-  document.getElementById('belumSetor').textContent = Math.max(0, listAnggota.length - sudahSetorSet.size);
-  document.getElementById('totalUang').textContent = rupiah(listSetoran.reduce((acc, curr) => acc + Number(curr.jumlah), 0));
+  document.getElementById('belumSetor').textContent = Math.max(0, globalAnggota.length - sudahSetorSet.size);
+  document.getElementById('totalUang').textContent = rupiah(globalSetoran.reduce((acc, curr) => acc + Number(curr.jumlah), 0));
 
-  document.getElementById('monitoring').innerHTML = listAnggota.length ? listAnggota.map((a, i) => {
+  renderMonitoring();
+  renderRiwayat();
+
+  document.getElementById('tanggal').value = todayDate;
+}
+
+function renderMonitoring() {
+  const keyword = document.getElementById('searchMonitoring').value.toLowerCase();
+  const todayDate = today();
+  const setoranHariIni = globalSetoran.filter(s => s.tanggal === todayDate);
+  
+  const filtered = globalAnggota.filter(a => a.nama.toLowerCase().includes(keyword));
+
+  document.getElementById('monitoring').innerHTML = filtered.length ? filtered.map((a, i) => {
     const s = setoranHariIni.find(x => x.nama === a.nama);
     return `<tr>
       <td>${i + 1}</td>
@@ -146,17 +175,23 @@ async function loadData() {
       <td class="status ${s ? 'ok' : 'no'}">${s ? 'Sudah setor' : 'Belum setor'}</td>
       <td class="actions">${s ? `<button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button>` : ''}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">Belum ada anggota.</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="empty">Tidak ada data anggota ditemukan.</td></tr>';
+}
 
-  document.getElementById('riwayat').innerHTML = listSetoran.length ? listSetoran.map(s => `<tr>
+function renderRiwayat() {
+  const keyword = document.getElementById('searchRiwayat').value.toLowerCase();
+  const filtered = globalSetoran.filter(s => s.nama.toLowerCase().includes(keyword) || s.tanggal.includes(keyword));
+
+  document.getElementById('riwayat').innerHTML = filtered.length ? filtered.map(s => `<tr>
     <td>${esc(s.nama)}</td>
     <td>${s.tanggal}</td>
     <td>${rupiah(s.jumlah)}</td>
     <td class="actions"><button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button></td>
-  </tr>`).join('') : '<tr><td colspan="4" class="empty">Belum ada setoran.</td></tr>';
-
-  document.getElementById('tanggal').value = todayDate;
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">Tidak ada riwayat ditemukan.</td></tr>';
 }
+
+function filterMonitoring() { renderMonitoring(); }
+function filterRiwayat() { renderRiwayat(); }
 
 document.getElementById('anggotaForm').onsubmit = async (e) => {
   e.preventDefault();
