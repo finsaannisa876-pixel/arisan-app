@@ -26,7 +26,6 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 .actions button{width:auto;padding:7px 10px;margin-right:4px;font-size:12px}
 .empty{text-align:center;color:#888;padding:20px}
 .alert-box{padding:12px;border-radius:10px;margin-bottom:16px;font-weight:bold;font-size:14px}
-.alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
 .alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
 .table-container{max-height:450px;overflow-y:auto}
 .badge-total{background:#eef0f4;padding:6px 12px;border-radius:8px;font-weight:bold;font-size:13px;color:#20242b}
@@ -40,7 +39,7 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
     <div class="muted">Monitoring setoran arisan real-time</div>
   </header>
 
-  <div id="statusKoneksi" class="alert-box" style="display:none;"></div>
+  <div id="statusKoneksi" class="alert-box alert-error" style="display:none;"></div>
 
   <div class="cards">
     <div class="card"><div class="label">Total Anggota</div><div class="value" id="totalAnggota">0</div></div>
@@ -135,11 +134,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 let globalAnggota = [];
 let globalSetoran = [];
 
-function tampilkanStatus(pesan, isError = false) {
+function tampilkanEror(pesan) {
   const el = document.getElementById('statusKoneksi');
   el.style.display = 'block';
-  el.className = 'alert-box ' + (isError ? 'alert-error' : 'alert-success');
   el.innerHTML = pesan;
+}
+
+function sembunyikanEror() {
+  const el = document.getElementById('statusKoneksi');
+  el.style.display = 'none';
 }
 
 async function apiFetch(endpoint, method = 'GET', body = null) {
@@ -159,9 +162,9 @@ async function loadData() {
   const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=nama.asc&limit=1000');
   const { data: setoran, error: errS } = await apiFetch('setoran?select=*&order=created_at.desc&limit=2000');
 
-  if (errA) tampilkanStatus("❌ Gagal load anggota: " + errA.message, true);
-  else if (errS) tampilkanStatus("❌ Gagal load setoran: " + errS.message, true);
-  else tampilkanStatus("✅ KONEKSI BERHASIL! Database Supabase terhubung.", false);
+  if (errA) tampilkanEror("❌ Gagal load anggota: " + errA.message);
+  else if (errS) tampilkanEror("❌ Gagal load setoran: " + errS.message);
+  else sembunyikanEror();
 
   globalAnggota = anggota || [];
   globalSetoran = setoran || [];
@@ -220,7 +223,6 @@ function renderMonitoring() {
 function renderRekapPerOrang() {
   const keyword = document.getElementById('searchRekap').value.toLowerCase();
   
-  // Peta total per orang
   const mapTotal = {};
   const mapCount = {};
 
