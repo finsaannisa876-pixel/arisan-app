@@ -12,13 +12,15 @@ h1{margin:0 0 6px;font-size:26px}.muted{color:#707782;font-size:14px}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
 .card{background:#fff;border-radius:15px;padding:16px;box-shadow:0 3px 15px #0000000d}.label{font-size:12px;color:#777}.value{font-size:21px;font-weight:700;margin-top:6px}
 .panel{background:#fff;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 3px 15px #0000000d}
-.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
 h2{font-size:18px;margin:0}
 form{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px}
 input,select,button{width:100%;padding:11px;border:1px solid #ddd;border-radius:10px;font-size:14px}
-.search-input{max-width:250px;padding:8px 12px;font-size:13px}
+.search-input{max-width:220px;padding:8px 12px;font-size:13px}
+.date-input{max-width:180px;padding:8px 12px;font-size:13px}
 button{background:#20242b;color:white;border:0;cursor:pointer;font-weight:600}
 button.secondary{background:#eef0f4;color:#20242b}
+button.danger{background:#d34a4a;color:#fff}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee;font-size:14px}
 th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color:#d34a4a}
 .actions button{width:auto;padding:7px 10px;margin-right:4px;font-size:12px}
@@ -26,8 +28,9 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 .alert-box{padding:12px;border-radius:10px;margin-bottom:16px;font-weight:bold;font-size:14px}
 .alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
 .alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-.table-container{max-height:500px;overflow-y:auto}
-@media(max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}form{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}table{font-size:12px}th,td{padding:9px 5px}.container{padding:12px}.panel-header{flex-direction:column;align-items:flex-start;gap:10px}.search-input{max-width:100%}}
+.table-container{max-height:450px;overflow-y:auto}
+.badge-total{background:#eef0f4;padding:6px 12px;border-radius:8px;font-weight:bold;font-size:13px;color:#20242b}
+@media(max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}form{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}table{font-size:12px}th,td{padding:9px 5px}.container{padding:12px}.panel-header{flex-direction:column;align-items:flex-start;gap:10px}.search-input,.date-input{max-width:100%}}
 </style>
 </head>
 <body>
@@ -41,9 +44,9 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 
   <div class="cards">
     <div class="card"><div class="label">Total Anggota</div><div class="value" id="totalAnggota">0</div></div>
-    <div class="card"><div class="label">Sudah Setor</div><div class="value" id="sudahSetor">0</div></div>
-    <div class="card"><div class="label">Belum Setor</div><div class="value" id="belumSetor">0</div></div>
-    <div class="card"><div class="label">Total Terkumpul</div><div class="value" id="totalUang">Rp0</div></div>
+    <div class="card"><div class="label">Sudah Setor Hari Ini</div><div class="value" id="sudahSetor">0</div></div>
+    <div class="card"><div class="label">Belum Setor Hari Ini</div><div class="value" id="belumSetor">0</div></div>
+    <div class="card"><div class="label">Total Semua Uang Masuk</div><div class="value" id="totalUang">Rp0</div></div>
   </div>
 
   <div class="panel">
@@ -66,9 +69,20 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 
   <div class="panel">
     <div class="panel-header">
-      <h2>Monitoring Hari Ini</h2>
-      <input type="text" id="searchMonitoring" class="search-input" placeholder="🔍 Cari nama anggota..." onkeyup="filterMonitoring()">
+      <div>
+        <h2>Monitoring Setoran Mingguan / Per Tanggal</h2>
+        <div class="muted" style="margin-top:4px;">Filter tanggal untuk melihat total setoran pada minggu tersebut</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="date" id="filterTanggal" class="date-input" onchange="renderMonitoring()">
+        <input type="text" id="searchMonitoring" class="search-input" placeholder="🔍 Cari nama..." onkeyup="filterMonitoring()">
+      </div>
     </div>
+    
+    <div style="margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
+      <span class="badge-total">Total Terkumpul Minggu/Tanggal Ini: <span id="totalMingguIni" style="color:#18864b;">Rp0</span></span>
+    </div>
+
     <div class="table-container">
       <table>
         <thead><tr><th>No</th><th>Nama</th><th>Tanggal Setor</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
@@ -79,7 +93,20 @@ th{color:#777;font-size:12px}.status{font-weight:700}.ok{color:#18864b}.no{color
 
   <div class="panel">
     <div class="panel-header">
-      <h2>Riwayat Setoran</h2>
+      <h2>Rekap Totalan Per Anggota (Akumulasi)</h2>
+      <input type="text" id="searchRekap" class="search-input" placeholder="🔍 Cari nama..." onkeyup="renderRekapPerOrang()">
+    </div>
+    <div class="table-container">
+      <table>
+        <thead><tr><th>No</th><th>Nama Anggota</th><th>Frekuensi Setor</th><th>Total Uang Disetor</th></tr></thead>
+        <tbody id="rekapPerOrang"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Riwayat Semua Setoran</h2>
       <input type="text" id="searchRiwayat" class="search-input" placeholder="🔍 Cari riwayat..." onkeyup="filterRiwayat()">
     </div>
     <div class="table-container">
@@ -129,8 +156,7 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
 }
 
 async function loadData() {
-  // Menaikkan limit pengambilan data hingga 1000 baris
-  const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=id.asc&limit=1000');
+  const { data: anggota, error: errA } = await apiFetch('anggota?select=*&order=nama.asc&limit=1000');
   const { data: setoran, error: errS } = await apiFetch('setoran?select=*&order=created_at.desc&limit=2000');
 
   if (errA) tampilkanStatus("❌ Gagal load anggota: " + errA.message, true);
@@ -144,38 +170,77 @@ async function loadData() {
   select.innerHTML = '<option value="">Pilih nama</option>' + globalAnggota.map(a => `<option value="${esc(a.nama)}">${esc(a.nama)}</option>`).join('');
 
   const todayDate = today();
+  if(!document.getElementById('filterTanggal').value) {
+    document.getElementById('filterTanggal').value = todayDate;
+  }
+  document.getElementById('tanggal').value = todayDate;
+
+  // Ringkasan Atas
   const setoranHariIni = globalSetoran.filter(s => s.tanggal === todayDate);
   const sudahSetorSet = new Set(setoranHariIni.map(s => s.nama));
 
   document.getElementById('totalAnggota').textContent = globalAnggota.length;
   document.getElementById('sudahSetor').textContent = sudahSetorSet.size;
   document.getElementById('belumSetor').textContent = Math.max(0, globalAnggota.length - sudahSetorSet.size);
-  document.getElementById('totalUang').textContent = rupiah(globalSetoran.reduce((acc, curr) => acc + Number(curr.jumlah), 0));
+  
+  // Total Semua Uang Masuk
+  const grandTotal = globalSetoran.reduce((acc, curr) => acc + Number(curr.jumlah), 0);
+  document.getElementById('totalUang').textContent = rupiah(grandTotal);
 
   renderMonitoring();
+  renderRekapPerOrang();
   renderRiwayat();
-
-  document.getElementById('tanggal').value = todayDate;
 }
 
 function renderMonitoring() {
   const keyword = document.getElementById('searchMonitoring').value.toLowerCase();
-  const todayDate = today();
-  const setoranHariIni = globalSetoran.filter(s => s.tanggal === todayDate);
+  const selectedDate = document.getElementById('filterTanggal').value;
   
+  const setoranTglTerpilih = globalSetoran.filter(s => s.tanggal === selectedDate);
+  
+  // Hitung total setoran minggu/tanggal ini
+  const totalMinggu = setoranTglTerpilih.reduce((acc, curr) => acc + Number(curr.jumlah), 0);
+  document.getElementById('totalMingguIni').textContent = rupiah(totalMinggu);
+
   const filtered = globalAnggota.filter(a => a.nama.toLowerCase().includes(keyword));
 
   document.getElementById('monitoring').innerHTML = filtered.length ? filtered.map((a, i) => {
-    const s = setoranHariIni.find(x => x.nama === a.nama);
+    const s = setoranTglTerpilih.find(x => x.nama === a.nama);
     return `<tr>
       <td>${i + 1}</td>
       <td>${esc(a.nama)}</td>
       <td>${s ? s.tanggal : '—'}</td>
       <td>${s ? rupiah(s.jumlah) : '—'}</td>
       <td class="status ${s ? 'ok' : 'no'}">${s ? 'Sudah setor' : 'Belum setor'}</td>
-      <td class="actions">${s ? `<button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button>` : ''}</td>
+      <td class="actions">${s ? `<button class="danger" onclick="hapusSetoran(${s.id})">Hapus / Cairkan</button>` : ''}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">Tidak ada data anggota ditemukan.</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="empty">Tidak ada data anggota.</td></tr>';
+}
+
+function renderRekapPerOrang() {
+  const keyword = document.getElementById('searchRekap').value.toLowerCase();
+  
+  // Peta total per orang
+  const mapTotal = {};
+  const mapCount = {};
+
+  globalSetoran.forEach(s => {
+    mapTotal[s.nama] = (mapTotal[s.nama] || 0) + Number(s.jumlah);
+    mapCount[s.nama] = (mapCount[s.nama] || 0) + 1;
+  });
+
+  const filtered = globalAnggota.filter(a => a.nama.toLowerCase().includes(keyword));
+
+  document.getElementById('rekapPerOrang').innerHTML = filtered.length ? filtered.map((a, i) => {
+    const total = mapTotal[a.nama] || 0;
+    const count = mapCount[a.nama] || 0;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td><b>${esc(a.nama)}</b></td>
+      <td>${count}x Setor</td>
+      <td><b style="color:#18864b">${rupiah(total)}</b></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" class="empty">Tidak ada data ditemukan.</td></tr>';
 }
 
 function renderRiwayat() {
@@ -186,7 +251,7 @@ function renderRiwayat() {
     <td>${esc(s.nama)}</td>
     <td>${s.tanggal}</td>
     <td>${rupiah(s.jumlah)}</td>
-    <td class="actions"><button class="secondary" onclick="hapusSetoran(${s.id})">Hapus</button></td>
+    <td class="actions"><button class="danger" onclick="hapusSetoran(${s.id})">Hapus</button></td>
   </tr>`).join('') : '<tr><td colspan="4" class="empty">Tidak ada riwayat ditemukan.</td></tr>';
 }
 
